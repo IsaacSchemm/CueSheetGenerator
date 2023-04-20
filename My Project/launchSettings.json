@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "CueSheetGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": "\"03 - Out Of My Head.mp3\" \"04 - Fire Escape.mp3\" \"05 - The Way.mp3\"",
+      "workingDirectory": "C:\\Users\\isaac\\Music\\Fastball\\Painting The Corners-  The Best Of Fastball"
+    }
+  }
+}
