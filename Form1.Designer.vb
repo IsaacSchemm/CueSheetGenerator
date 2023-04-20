@@ -60,7 +60,6 @@ Partial Class Form1
         '
         'Button2
         '
-        Me.Button2.Enabled = False
         Me.Button2.Location = New System.Drawing.Point(168, 38)
         Me.Button2.Name = "Button2"
         Me.Button2.Size = New System.Drawing.Size(150, 23)

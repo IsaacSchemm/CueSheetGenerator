@@ -20,6 +20,9 @@ Public Class Form1
     End Sub
 
     Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        Button1.Enabled = False
+        Button2.Enabled = False
+
         Dim inputFileByteLengths As New List(Of Long)
         Dim inputFileDurations As New List(Of TimeSpan)
         For Each inputFile In InputFiles
@@ -62,7 +65,7 @@ Public Class Form1
         ProgressBar1.Maximum = inputFileByteLengths.Sum()
 
         Using fs As New FileStream("out.wav", FileMode.CreateNew, FileAccess.Write)
-            Dim buffer(33554432) As Byte
+            Dim buffer(33554431) As Byte
             Using combinedWriter As New WaveFileWriter(fs, New WaveFormat(44100, 2))
                 For Each inputFile In InputFiles
                     Using reader As New MediaFoundationReader(inputFile)
@@ -79,6 +82,43 @@ Public Class Form1
                 Next
             End Using
         End Using
+
+        Application.Exit()
+    End Sub
+
+    Private Async Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Button1.Enabled = False
+        Button2.Enabled = False
+
+        Dim inputFileByteLengths As New List(Of Long)
+        For Each inputFile In InputFiles
+            Using reader As New MediaFoundationReader(inputFile)
+                inputFileByteLengths.Add(reader.Length)
+            End Using
+        Next
+
+        ProgressBar1.Maximum = inputFileByteLengths.Sum()
+
+        Dim i = 1
+
+        For Each inputFile In InputFiles
+            Using reader As New MediaFoundationReader(inputFile)
+                Dim buffer(reader.WaveFormat.AverageBytesPerSecond * 60 * NumericUpDown1.Value - 1) As Byte
+                Do
+                    Dim bytesRead = Await reader.ReadAsync(buffer, 0, buffer.Length)
+                    If bytesRead <= 0 Then
+                        Exit Do
+                    End If
+                    ProgressBar1.Value += bytesRead
+                    Using fs As New FileStream($"out{i:D3}.wav", FileMode.CreateNew, FileAccess.Write)
+                        Using writer As New WaveFileWriter(fs, New WaveFormat(44100, 2))
+                            Await writer.WriteAsync(buffer, 0, bytesRead)
+                        End Using
+                    End Using
+                    i += 1
+                Loop
+            End Using
+        Next
 
         Application.Exit()
     End Sub
