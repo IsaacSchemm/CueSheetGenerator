@@ -2,17 +2,34 @@
 Imports NAudio.Wave
 
 Public Class Form1
-    Async Sub Form1_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
+    Private ReadOnly InputFiles As New List(Of String)
+
+    Private Sub Form1_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
+        InputFiles.AddRange(My.Application.CommandLineArgs.Where(Function(x) File.Exists(x)))
+
+        If InputFiles.Count = 0 Then
+            Using dialog As New OpenFileDialog()
+                dialog.Multiselect = True
+                If dialog.ShowDialog(Me) <> DialogResult.OK Then
+                    Application.Exit()
+                End If
+
+                InputFiles.AddRange(dialog.FileNames)
+            End Using
+        End If
+    End Sub
+
+    Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
         Dim inputFileByteLengths As New List(Of Long)
         Dim inputFileDurations As New List(Of TimeSpan)
-        For Each inputFile In My.Application.CommandLineArgs
+        For Each inputFile In InputFiles
             Using reader As New MediaFoundationReader(inputFile)
                 inputFileByteLengths.Add(reader.Length)
                 inputFileDurations.Add(reader.TotalTime)
             End Using
         Next
 
-        Dim segmentLength = TimeSpan.FromMinutes(5)
+        Dim segmentLength = TimeSpan.FromMinutes(NumericUpDown1.Value)
         Dim trackBoundaries As New List(Of TimeSpan)
         For Each inputFileDuration In inputFileDurations
             Dim ts = inputFileDuration
@@ -47,7 +64,7 @@ Public Class Form1
         Using fs As New FileStream("out.wav", FileMode.CreateNew, FileAccess.Write)
             Dim buffer(33554432) As Byte
             Using combinedWriter As New WaveFileWriter(fs, New WaveFormat(44100, 2))
-                For Each inputFile In My.Application.CommandLineArgs
+                For Each inputFile In InputFiles
                     Using reader As New MediaFoundationReader(inputFile)
                         Dim byteLength = reader.Length
                         Do
