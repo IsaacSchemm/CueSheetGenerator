@@ -23,11 +23,9 @@ Public Class Form1
         Button1.Enabled = False
         Button2.Enabled = False
 
-        Dim inputFileByteLengths As New List(Of Long)
         Dim inputFileDurations As New List(Of TimeSpan)
         For Each inputFile In InputFiles
             Using reader As New MediaFoundationReader(inputFile)
-                inputFileByteLengths.Add(reader.Length)
                 inputFileDurations.Add(reader.TotalTime)
             End Using
         Next
@@ -62,22 +60,24 @@ Public Class Form1
             End Using
         End Using
 
-        ProgressBar1.Maximum = inputFileByteLengths.Sum()
+        ProgressBar1.Maximum = inputFileDurations.Select(Function(x) x.TotalSeconds * 2 * 2 * 44100).Sum()
 
         Using fs As New FileStream("out.wav", FileMode.CreateNew, FileAccess.Write)
             Dim buffer(33554431) As Byte
             Using combinedWriter As New WaveFileWriter(fs, New WaveFormat(44100, 2))
                 For Each inputFile In InputFiles
                     Using reader As New MediaFoundationReader(inputFile)
-                        Dim byteLength = reader.Length
-                        Do
-                            Dim bytesRead = Await reader.ReadAsync(buffer, 0, buffer.Length)
-                            If bytesRead <= 0 Then
-                                Exit Do
-                            End If
-                            ProgressBar1.Value += bytesRead
-                            Await combinedWriter.WriteAsync(buffer, 0, bytesRead)
-                        Loop
+                        Using resampler = New MediaFoundationResampler(reader, 44100)
+                            Dim waveProvider = resampler.ToSampleProvider().ToStereo().ToWaveProvider16()
+                            Do
+                                Dim bytesRead = waveProvider.Read(buffer, 0, buffer.Length)
+                                If bytesRead <= 0 Then
+                                    Exit Do
+                                End If
+                                ProgressBar1.Value += bytesRead
+                                Await combinedWriter.WriteAsync(buffer, 0, bytesRead)
+                            Loop
+                        End Using
                     End Using
                 Next
             End Using
@@ -90,33 +90,36 @@ Public Class Form1
         Button1.Enabled = False
         Button2.Enabled = False
 
-        Dim inputFileByteLengths As New List(Of Long)
+        Dim inputFileDurations As New List(Of TimeSpan)
         For Each inputFile In InputFiles
             Using reader As New MediaFoundationReader(inputFile)
-                inputFileByteLengths.Add(reader.Length)
+                inputFileDurations.Add(reader.TotalTime)
             End Using
         Next
 
-        ProgressBar1.Maximum = inputFileByteLengths.Sum()
+        ProgressBar1.Maximum = inputFileDurations.Select(Function(x) x.TotalSeconds * 2 * 2 * 44100).Sum()
 
         Dim i = 1
 
         For Each inputFile In InputFiles
             Using reader As New MediaFoundationReader(inputFile)
-                Dim buffer(reader.WaveFormat.AverageBytesPerSecond * 60 * NumericUpDown1.Value - 1) As Byte
-                Do
-                    Dim bytesRead = Await reader.ReadAsync(buffer, 0, buffer.Length)
-                    If bytesRead <= 0 Then
-                        Exit Do
-                    End If
-                    ProgressBar1.Value += bytesRead
-                    Using fs As New FileStream($"out{i:D3}.wav", FileMode.CreateNew, FileAccess.Write)
-                        Using writer As New WaveFileWriter(fs, New WaveFormat(44100, 2))
-                            Await writer.WriteAsync(buffer, 0, bytesRead)
+                Using resampler = New MediaFoundationResampler(reader, 44100)
+                    Dim waveProvider = resampler.ToSampleProvider().ToStereo().ToWaveProvider16()
+                    Dim buffer(44100 * 2 * 2 * 60 * NumericUpDown1.Value - 1) As Byte
+                    Do
+                        Dim bytesRead = waveProvider.Read(buffer, 0, buffer.Length)
+                        If bytesRead <= 0 Then
+                            Exit Do
+                        End If
+                        ProgressBar1.Value = Math.Min(ProgressBar1.Value + bytesRead, ProgressBar1.Maximum)
+                        Using fs As New FileStream($"out{i:D3}.wav", FileMode.CreateNew, FileAccess.Write)
+                            Using writer As New WaveFileWriter(fs, New WaveFormat(44100, 2))
+                                Await writer.WriteAsync(buffer, 0, bytesRead)
+                            End Using
                         End Using
-                    End Using
-                    i += 1
-                Loop
+                        i += 1
+                    Loop
+                End Using
             End Using
         Next
 
